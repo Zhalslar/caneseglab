@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CaneSegLab 操作台</title>
+    <link rel="stylesheet" href="/static/app.css?v=20260325b">
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <p class="eyebrow">Labelme / 训练 / 推理 / 导航</p>
+          <h1 id="page-title">CaneSegLab 操作台</h1>
+        </div>
+        <div class="topbar-status">
+          <div class="status-pill">
+            <span>任务模式</span>
+            <strong id="single-job-mode">单任务</strong>
+          </div>
+          <div class="status-pill status-pill-wide">
+            <span>训练产物根目录</span>
+            <strong id="artifacts-root">-</strong>
+          </div>
+        </div>
+      </header>
+
+      <nav class="page-tabs" aria-label="主页面切换">
+        <button type="button" class="tab-button active" data-page="data">数据页面</button>
+        <button type="button" class="tab-button" data-page="train">训练页面</button>
+        <button type="button" class="tab-button" data-page="infer">推理页面</button>
+        <button type="button" class="tab-button" data-page="navigation">导航页面</button>
+        <button type="button" class="tab-button" data-page="analysis">分析页面</button>
+      </nav>
+
+      <main class="page-stack">
+        <section class="page active" data-page-panel="data">
+          <section class="panel dataset-page-panel">
+            <div class="panel-head dataset-page-head">
+              <h2>数据集</h2>
+              <div class="dataset-root-pill">
+                <strong id="dataset-root">-</strong>
+              </div>
+            </div>
+            <div id="dataset-cards" class="dataset-card-list"></div>
+          </section>
+        </section>
+
+        <section class="page" data-page-panel="train">
+          <div class="grid">
+            <section class="panel panel-wide">
+              <div class="panel-head">
+                <h2>训练模型</h2>
+                <p>训练输出会自动写入新的 run 目录，常用参数集中在这里调整。</p>
+              </div>
+              <form id="train-form" class="form-grid train-grid">
+                <label>
+                  <span>数据集</span>
+                  <select name="dataset_name" id="train-dataset" required></select>
+                </label>
+                <div class="path-hint" id="train-paths">图像目录：-<br>掩码目录：-</div>
+                <label>
+                  <span>模型</span>
+                  <input name="model_name" value="Unet" placeholder="Unet 或 OriginalUNet">
+                </label>
+                <label>
+                  <span>Backbone</span>
+                  <input name="backbone" value="efficientnet-b0">
+                </label>
+                <label>
+                  <span>训练轮数</span>
+                  <input name="epochs" type="number" min="1" step="1">
+                </label>
+                <label>
+                  <span>学习率</span>
+                  <input name="learning_rate" type="number" min="0" step="0.0001">
+                </label>
+                <label>
+                  <span>训练批大小</span>
+                  <input name="train_batch_size" type="number" min="1" step="1">
+                </label>
+                <label>
+                  <span>验证批大小</span>
+                  <input name="valid_batch_size" type="number" min="1" step="1">
+                </label>
+                <label>
+                  <span>设备</span>
+                  <input name="device" value="auto">
+                </label>
+                <label class="check">
+                  <input name="export_onnx" type="checkbox">
+                  <span>训练完成后自动导出 ONNX</span>
+                </label>
+                <button type="submit">开始训练</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h2>导出 ONNX</h2>
+                <p>默认导出最近一次训练的最佳权重，也可以手动指定输出位置。</p>
+              </div>
+              <form id="export-form" class="form-grid">
+                <label>
+                  <span>输出路径</span>
+                  <input name="output_path" placeholder="留空则写入最近一次训练目录">
+                </label>
+                <button type="submit">导出 ONNX</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h2>导出 TensorRT</h2>
+                <p>默认读取最近一次训练产物里的 ONNX，并写入该 `model.onnx` 同目录下的 `model.trt`。</p>
+              </div>
+              <form id="export-trt-form" class="form-grid">
+                <label>
+                  <span>ONNX 路径</span>
+                  <input name="onnx_path" placeholder="留空则读取最近一次训练产物中的 model.onnx">
+                </label>
+                <label>
+                  <span>输出路径</span>
+                  <input name="output_path" placeholder="留空则写入所选 model.onnx 同目录下的 model.trt">
+                </label>
+                <button type="submit">导出 TensorRT</button>
+              </form>
+            </section>
+
+            <section class="panel panel-wide">
+              <div class="panel-head">
+                <h2>最近训练产物</h2>
+                <p>支持直接查看权重、历史文件和推理生成的图片。</p>
+              </div>
+              <div id="artifacts" class="artifact-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" data-page-panel="infer">
+          <div class="grid">
+            <section class="panel panel-wide">
+              <div class="panel-head">
+                <h2>统一推理</h2>
+                <p>在同一个面板里切换 ONNX / TensorRT 推理方式，图片选择复用数据页面的网格弹窗。</p>
+              </div>
+              <form id="infer-form" class="form-grid infer-grid">
+                <label>
+                  <span>推理方式</span>
+                  <select name="method" id="infer-method" required>
+                    <option value="verify-onnx">ONNX 推理</option>
+                    <option value="infer-trt">TensorRT 推理</option>
+                  </select>
+                </label>
+                <label>
+                  <span>数据集</span>
+                  <select name="dataset_name" id="infer-dataset" required></select>
+                </label>
+                <label>
+                  <span>模型文件</span>
+                  <select name="model_path" id="infer-model" required></select>
+                </label>
+                <div class="infer-picker-block">
+                  <div class="infer-picker-head">
+                    <div>
+                      <span class="infer-picker-label">输入图像</span>
+                      <p id="infer-image-summary" class="meta">请先从图片网格中选择一张图片。</p>
+                    </div>
+                    <button type="button" class="ghost-button" id="infer-image-picker">从网格选择图片</button>
+                  </div>
+                  <input type="hidden" name="image_path" id="infer-image-path" required>
+                  <div id="infer-picked-card" class="infer-picked-card empty">当前还没有选中的图片。</div>
+                </div>
+                <div class="path-hint" id="infer-model-path">当前模型：-</div>
+                <button type="submit" id="infer-submit">执行推理</button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" data-page-panel="navigation">
+          <div class="grid">
+            <section class="panel panel-wide">
+              <div class="panel-head">
+                <h2>导航线拟合</h2>
+                <p>先执行分割，再从掩码中拟合垄间导航线，输出偏移、航向角、导航覆盖图和 JSON 结果。</p>
+              </div>
+              <form id="navigation-form" class="form-grid infer-grid">
+                <label>
+                  <span>导航方式</span>
+                  <select name="method" id="navigation-method" required>
+                    <option value="navigate-onnx">ONNX 导航</option>
+                    <option value="navigate-trt">TensorRT 导航</option>
+                  </select>
+                </label>
+                <label>
+                  <span>数据集</span>
+                  <select name="dataset_name" id="navigation-dataset" required></select>
+                </label>
+                <label>
+                  <span>模型文件</span>
+                  <select name="model_path" id="navigation-model" required></select>
+                </label>
+                <div class="path-hint" id="navigation-output-hint">导航输出目录：-</div>
+                <div class="infer-picker-block">
+                  <div class="infer-picker-head">
+                    <div>
+                      <span class="infer-picker-label">输入图像</span>
+                      <p id="navigation-image-summary" class="meta">请先从图片网格中选择一张图片。</p>
+                    </div>
+                    <button type="button" class="ghost-button" id="navigation-image-picker">从网格选择图片</button>
+                  </div>
+                  <input type="hidden" name="image_path" id="navigation-image-path" required>
+                  <div id="navigation-picked-card" class="infer-picked-card empty">当前还没有选中的图片。</div>
+                </div>
+                <div class="path-hint" id="navigation-model-path">当前模型：-</div>
+                <button type="submit" id="navigation-submit">执行导航</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h2>批量导航</h2>
+                <p>对当前数据集所有未生成导航结果的图像批量执行 ONNX 导航，结果会写入数据集的 navigation 目录。</p>
+              </div>
+              <form id="navigation-batch-form" class="form-grid">
+                <div class="path-hint">批量模式固定使用 ONNX 模型，适合先把整批图像的导航覆盖图和 JSON 一次性补齐。</div>
+                <button type="submit" id="navigation-batch-submit">批量生成当前数据集导航结果</button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section class="page" data-page-panel="analysis">
+          <div class="grid">
+            <section class="panel panel-wide">
+              <div class="panel-head">
+                <h2>推理测速</h2>
+                <p>统一记录 PyTorch、ONNX Runtime、TensorRT 的耗时与 FPS，优先复用已训练的 run 产物。</p>
+              </div>
+              <form id="benchmark-form" class="form-grid train-grid">
+                <label>
+                  <span>数据集</span>
+                  <select name="dataset_name" id="benchmark-dataset" required></select>
+                </label>
+                <label>
+                  <span>训练产物</span>
+                  <select name="run_dir" id="benchmark-run"></select>
+                </label>
+                <div class="path-hint" id="benchmark-run-hint">测速图像目录：-</div>
+                <label>
+                  <span>输出目录</span>
+                  <input name="output_dir" placeholder="留空则写入 data/benchmarks">
+                </label>
+                <label>
+                  <span>预热次数</span>
+                  <input name="warmup_runs" type="number" min="0" step="1" value="5">
+                </label>
+                <label>
+                  <span>计时次数</span>
+                  <input name="timed_runs" type="number" min="1" step="1" value="30">
+                </label>
+                <label>
+                  <span>最大图片数</span>
+                  <input name="max_images" type="number" min="1" step="1" value="12">
+                </label>
+                <div class="analysis-check-group">
+                  <label class="check compact-check">
+                    <input id="benchmark-backend-pytorch" name="backend_pytorch" type="checkbox" checked>
+                    <span>PyTorch</span>
+                  </label>
+                  <label class="check compact-check">
+                    <input id="benchmark-backend-onnx" name="backend_onnx" type="checkbox" checked>
+                    <span>ONNX Runtime</span>
+                  </label>
+                  <label class="check compact-check">
+                    <input id="benchmark-backend-trt" name="backend_trt" type="checkbox" checked>
+                    <span>TensorRT</span>
+                  </label>
+                </div>
+                <button type="submit">开始测速</button>
+              </form>
+            </section>
+
+            <section class="panel panel-wide">
+              <div class="panel-head">
+                <h2>论文图与导航审计</h2>
+                <p>导出统一风格论文图，同时对现有导航结果做一次整体统计审计。</p>
+              </div>
+              <div class="split-panel-grid">
+                <form id="paper-figures-form" class="form-grid">
+                  <div class="path-hint" id="figure-history-hint">history：留空时自动使用最近一次训练结果。</div>
+                  <label>
+                    <span>训练 History</span>
+                    <select name="history_path" id="figure-history-path"></select>
+                  </label>
+                  <label>
+                    <span>导航结果根目录</span>
+                    <input name="navigation_root" id="figure-navigation-root" placeholder="留空则使用数据集根目录">
+                  </label>
+                  <label>
+                    <span>输出目录</span>
+                    <input name="output_dir" placeholder="留空则写入 data/paper_figures">
+                  </label>
+                  <button type="submit">导出论文图</button>
+                </form>
+
+                <form id="navigation-audit-form" class="form-grid">
+                  <label>
+                    <span>导航结果根目录</span>
+                    <input name="navigation_root" id="audit-navigation-root" placeholder="优先填写数据集目录，如 D:\labelme\data\samples\all；留空则使用数据集根目录">
+                  </label>
+                  <label>
+                    <span>输出目录</span>
+                    <input name="output_dir" placeholder="留空则输出到导航根目录">
+                  </label>
+                  <button type="submit">执行导航审计</button>
+                </form>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <button type="button" class="task-fab" id="task-toggle" aria-label="打开任务中心">
+      <span class="task-running-badge" id="task-running-badge" hidden>0</span>
+      <svg class="task-fab-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"></path>
+      </svg>
+    </button>
+
+    <div class="modal-layer task-center-modal" id="task-center-modal" aria-hidden="true">
+      <button type="button" class="modal-backdrop" id="task-center-backdrop" aria-label="关闭任务中心"></button>
+      <section class="task-panel task-modal-card" role="dialog" aria-modal="true" aria-labelledby="task-center-title">
+        <header class="task-panel-head">
+          <div>
+            <p class="eyebrow">后台任务</p>
+            <h2 id="task-center-title">任务中心</h2>
+            <p id="task-summary" class="meta">当前无运行任务</p>
+          </div>
+          <div class="task-panel-actions">
+            <span id="task-count" class="meta">0 个任务</span>
+            <button type="button" id="task-center-close" class="ghost-button">关闭</button>
+          </div>
+        </header>
+        <div id="job-list" class="job-list"></div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="dataset-gallery-modal" aria-hidden="true">
+      <button type="button" class="modal-backdrop" id="dataset-gallery-backdrop" aria-label="关闭数据集图片"></button>
+      <section class="dataset-gallery-card" role="dialog" aria-modal="true" aria-labelledby="dataset-gallery-title">
+        <header class="dataset-gallery-head">
+          <div>
+            <p class="eyebrow">数据集图片</p>
+            <h2 id="dataset-gallery-title">数据集图片</h2>
+            <p id="dataset-gallery-hint" class="meta">点击数据集卡片查看图片。</p>
+          </div>
+          <button type="button" id="dataset-gallery-close" class="ghost-button">关闭</button>
+        </header>
+        <div id="dataset-gallery-grid" class="dataset-gallery-grid empty">当前未选择数据集。</div>
+      </section>
+    </div>
+
+    <div class="modal-layer" id="detail-modal" aria-hidden="true">
+      <button type="button" class="modal-backdrop" id="detail-backdrop" aria-label="关闭任务详情"></button>
+      <section class="detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
+        <header class="detail-modal-head">
+          <div>
+            <p class="eyebrow">任务详情</p>
+            <h2 id="detail-modal-title">点击任务查看详情</h2>
+            <p id="task-detail-hint" class="meta">图片支持继续放大查看。</p>
+          </div>
+          <button type="button" id="detail-close" class="ghost-button">关闭</button>
+        </header>
+        <div id="job-detail" class="job-detail empty">点击右上角任务中心中的任务查看详情。</div>
+      </section>
+    </div>
+
+    <div class="modal-layer preview-modal" id="preview-modal" aria-hidden="true">
+      <button type="button" class="modal-backdrop" id="preview-backdrop" aria-label="关闭图片预览"></button>
+      <section class="preview-modal-card" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <header class="preview-modal-head">
+          <div>
+            <h2 id="preview-title">图片预览</h2>
+            <p id="preview-caption" class="meta">点击外部空白区域可关闭。</p>
+          </div>
+          <button type="button" id="preview-close" class="ghost-button">关闭</button>
+        </header>
+        <div class="preview-stage">
+          <img id="preview-image" class="preview-image" alt="">
+        </div>
+      </section>
+    </div>
+
+    <aside class="toast" id="toast"></aside>
+    <script type="module" src="/static/app/main.js?v=20260511a"></script>
+  </body>
+</html>

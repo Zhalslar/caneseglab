@@ -1,0 +1,13 @@
+aiohttp
+albumentations
+matplotlib
+numpy
+onnx
+onnxruntime
+opencv-python
+Pillow
+cuda-python>=12,<13
+segmentation-models-pytorch
+tensorrt-cu12
+torch
+tqdm
